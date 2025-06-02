@@ -1,3 +1,4 @@
-Flask
-flask-cors
-genanki
+Flask==3.1.1
+flask-cors==6.0.0
+genanki==0.13.1
+gunicorn==20.1.0
