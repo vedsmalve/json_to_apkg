@@ -1,13 +1,15 @@
+# app.py
 import os
 import uuid
 import json
 import tempfile
 from flask import Flask, request, send_file, jsonify
+from flask_cors import CORS
 import genanki
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
-# Root route for health check or default view
 @app.route('/')
 def index():
     return "✅ JSON to Anki .apkg backend is live!"
@@ -15,12 +17,16 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate_apkg():
     try:
-        data = request.get_json()
+        if 'json_file' not in request.files:
+            return jsonify({'error': 'No JSON file part in the request'}), 400
 
-        if not data or 'questions' not in data:
-            return jsonify({'error': 'Invalid input format. Expected a JSON with a "questions" key.'}), 400
+        json_file = request.files['json_file']
+        data = json.load(json_file)
 
-        model_id = int(uuid.uuid4()) >> 64  # Create a valid 32-bit model ID
+        if 'questions' not in data:
+            return jsonify({'error': 'Invalid input format. Expected a JSON with a \"questions\" key.'}), 400
+
+        model_id = int(uuid.uuid4()) >> 64
         model = genanki.Model(
             model_id,
             'Simple Model',
@@ -36,8 +42,9 @@ def generate_apkg():
                 },
             ])
 
+        deck_name = request.form.get('deck_name', 'My Anki Deck')
         deck_id = int(uuid.uuid4()) >> 64
-        deck = genanki.Deck(deck_id, 'My Anki Deck')
+        deck = genanki.Deck(deck_id, deck_name)
 
         for item in data['questions']:
             question = item.get('question', '').strip()
@@ -46,10 +53,12 @@ def generate_apkg():
                 note = genanki.Note(model=model, fields=[question, answer])
                 deck.add_note(note)
 
+        output_name = request.form.get('output_name', 'anki_deck.apkg')
+
         with tempfile.NamedTemporaryFile(delete=False, suffix='.apkg') as tmp:
             genanki.Package(deck).write_to_file(tmp.name)
             tmp.flush()
-            return send_file(tmp.name, as_attachment=True, download_name='anki_deck.apkg')
+            return send_file(tmp.name, as_attachment=True, download_name=output_name)
 
     except Exception as e:
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
