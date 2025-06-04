@@ -20,7 +20,10 @@ def generate_apkg():
         if not data or 'questions' not in data:
             return jsonify({'error': 'Invalid input format. Expected a JSON with a "questions" key.'}), 400
 
-        # Use 64-bit UUID and mask for a valid 32-bit integer ID
+        # Get deck name from JSON, default if missing
+        deck_name = data.get('deckName', 'My Anki Deck')
+
+        # Generate unique IDs for model and deck
         model_id = uuid.uuid4().int >> 96
         model = genanki.Model(
             model_id,
@@ -38,7 +41,7 @@ def generate_apkg():
             ])
 
         deck_id = uuid.uuid4().int >> 96
-        deck = genanki.Deck(deck_id, 'My Anki Deck')
+        deck = genanki.Deck(deck_id, deck_name)
 
         for item in data['questions']:
             question = item.get('question', '').strip()
